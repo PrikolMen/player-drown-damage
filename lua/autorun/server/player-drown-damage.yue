@@ -1,0 +1,58 @@
+addonName = "Player Drown Damage"
+
+FCVAR_FLAGS = bit.bor( FCVAR_ARCHIVE, FCVAR_NOTIFY )
+:WaterLevel, :EyePos = FindMetaTable( "Entity" )
+:Alive = FindMetaTable( "Player" )
+vector_origin = vector_origin
+DamageInfo = DamageInfo
+DMG_DROWN = DMG_DROWN
+:random, :max = math
+CurTime = CurTime
+:Add = hook
+
+mp_player_air_capacity_min = CreateConVar( "mp_player_air_capacity_min", "15", FCVAR_FLAGS, "Minimum time a player can stay underwater.", 0, 0x4000 )\GetFloat!
+mp_player_air_capacity_max = CreateConVar( "mp_player_air_capacity_max", "45", FCVAR_FLAGS, "Maximum time a player can stay underwater.", 0, 0x4000 )\GetFloat!
+mp_player_drown_damage_delay = CreateConVar( "mp_player_drown_damage_delay", "0.5", FCVAR_FLAGS, "Delay between a player taking damage from drowning.", 0, 10 )\GetFloat!
+
+cvars.AddChangeCallback( "mp_player_air_capacity_min", ( _, __, value ) ->
+    mp_player_air_capacity_min = tonumber( value ) or 0
+addonName )
+
+cvars.AddChangeCallback( "mp_player_air_capacity_max", ( _, __, value ) ->
+    mp_player_air_capacity_max = tonumber( value ) or 0
+addonName )
+
+cvars.AddChangeCallback( "mp_player_drown_damage_delay", ( _, __, value ) ->
+    mp_player_drown_damage_delay = tonumber( value ) or 0
+addonName )
+
+Add( "OnEntityWaterLevelChanged", addonName, ( oldWaterLevel, newWaterLevel ) =>
+    if newWaterLevel == 3 and oldWaterLevel < newWaterLevel and @IsPlayer! and Alive( @ )
+        if mp_player_air_capacity_min == mp_player_air_capacity_max
+            @m_dDrownDamageTime = CurTime! + mp_player_air_capacity_min
+            return
+
+        @m_dDrownDamageTime = CurTime! + random( mp_player_air_capacity_min, mp_player_air_capacity_max )
+
+PRE_HOOK )
+
+Add( "PlayerInitialSpawn", addonName, =>
+    @m_dDrownDamageTime = 0
+
+PRE_HOOK )
+
+Add( "PlayerPostThink", addonName, =>
+    if Alive( @ ) and WaterLevel( @ ) == 3 and @m_dDrownDamageTime < CurTime!
+        @m_dDrownDamageTime = CurTime! + mp_player_drown_damage_delay
+
+        damageInfo = DamageInfo!
+        damageInfo\SetDamageType( DMG_DROWN )
+        damageInfo\SetDamageForce( vector_origin )
+        damageInfo\SetAttacker( @ )
+        damageInfo\SetDamage( max( 5, @Health! * 0.1 ) )
+        damageInfo\SetDamagePosition( EyePos( @ ) )
+
+        @EmitSound( "Player.DrownContinue" )
+        @TakeDamageInfo( damageInfo )
+
+PRE_HOOK )
